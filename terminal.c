@@ -104,7 +104,7 @@ void parseFields(USER_DATA * data) // Populate fieldCount, fieldPosition, fieldT
     uint8_t i = 0;
     char prev = 'd'; // Assume previous char is a delimiter
     data->fieldCount = 0;
-    char delimPos[MAX_CHARS]; //Holds the position of delimiters for turning into null chars later
+    uint16_t delimPos[MAX_CHARS]; //Holds the position of delimiters for turning into null chars later
     uint16_t delimIndex = 0;
     uint16_t delimCount = 0;
 
@@ -153,28 +153,84 @@ void parseFields(USER_DATA * data) // Populate fieldCount, fieldPosition, fieldT
 
     uint8_t j;
 
-    for(j = 0; delimPos[j]!=0; j++)
+    for(j = 0; j<delimCount; j++)
     {
         data->buffer[delimPos[j]] = 0;
     }
 
 }
-/*
+
 char* getFieldString(USER_DATA * data, uint8_t fieldNumber)
 {
 
+    if(fieldNumber>data->fieldCount || fieldNumber<1 )
+        return NULL;
+
+    return &data->buffer[data->fieldPosition[fieldNumber]];
 }
 
-int32_t getFieldInteger(USER_DATA * data, uint8_t filedNumber)
+int strToInt(char a[]) { // Obtained from https://www.programmingsimplified.com/c/source-code/c-program-convert-string-to-integer-without-using-atoi-function
+    int c, sign, offset, n;
+
+    if (a[0] == '-') {  // Handle negative integers
+        sign = -1;
+    }
+
+    if (sign == -1) {  // Set starting position to convert
+        offset = 1;
+    }
+    else {
+        offset = 0;
+    }
+
+    n = 0;
+
+    for (c = offset; a[c] != '\0'; c++) {
+        n = n * 10 + a[c] - '0';
+    }
+
+    if (sign == -1) {
+        n = -n;
+    }
+
+  return n;
+}
+
+
+int32_t getFieldInteger(USER_DATA * data, uint8_t fieldNumber)
 {
 
+    if(fieldNumber>data->fieldCount || fieldNumber<1 )
+        return NULL;
+
+    return strToInt(&data->buffer[data->fieldPosition[fieldNumber]]);
+}
+
+
+int strCompare(char* arg1, char* arg2) // Returns 0 for equal strings
+{
+    uint8_t i = 0;
+    while(arg1[i]==arg2[i])
+    {
+        if(arg1[i]=='\0' && arg2[i]=='\0')
+            break;
+        i++;
+    }
+
+    return arg1[i]-arg2[i];
 }
 
 bool isCommand(USER_DATA * data, const char strCommand[],uint8_t minArguments)
 {
+    if(strCompare(&data->buffer[data->fieldPosition[0]],strCommand)==0)
+    {
+        if(data->fieldCount-1 == minArguments)
+            return true;
+    }
 
+    return false;
 }
-*/
+
 
 
 //-----------------------------------------------------------------------------
@@ -189,17 +245,20 @@ int main(void)
 
     setUart0BaudRate(115200, 40e6);
 
-    USER_DATA command;
+    //int32_t gotInt;
 
     while(1)
     {
+        USER_DATA command;
         getsUart0(&command);
+        putsUart0("Command typed in: ");
         putsUart0(command.buffer);
         putcUart0('\n');
+        putcUart0('\r');
 
 
         parseFields(&command);
-        uint8_t i;
+       /* uint8_t i;
         for(i = 0; i<command.fieldCount;i++)
         {
             putcUart0(command.fieldType[i]);
@@ -207,6 +266,34 @@ int main(void)
             putsUart0(&command.buffer[command.fieldPosition[i]]);
             putcUart0('\n');
         }
+
+        char* gotString = getFieldString(&command, 2);
+        putsUart0(gotString); */
+
+        // set add, data -> add and data are integers
+        bool val = false;
+
+        if(isCommand(&command,"set",2))
+        {
+            int32_t add = getFieldInteger(&command,1);
+            int32_t data = getFieldInteger(&command,2);
+            putcUart0(add+data);
+            val = true;
+        }
+        else if(isCommand(&command, "alert",1))
+        {
+            char* str = getFieldString(&command,1);
+            if(strCompare(str,"on")==0)
+                putsUart0("Alert is on.");
+            if(strCompare(str,"off")==0)
+                putsUart0("Alert is off.");
+            val = true;
+        }
+
+        if(!val)
+            putsUart0("Invalid Command");
+        putcUart0('\n');
+        putcUart0('\r');
     }
 
 }
